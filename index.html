@@ -2,26 +2,33 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>2025国赛A题-精简空间布局</title>
+    <title>2025国赛A题-带编号标注布局</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #050505; }
         #legend {
             position: absolute; top: 20px; left: 20px; color: #fff;
             font-family: sans-serif; background: rgba(0,0,0,0.8);
             padding: 12px; border-radius: 6px; border: 1px solid #444;
-            pointer-events: none; font-size: 13px;
+            pointer-events: none; font-size: 13px; z-index: 10;
         }
-        .item { margin-bottom: 4px; display: flex; align-items: center; }
-        .color-box { width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; }
+        /* 标签样式 */
+        .label {
+            color: #ffffff;
+            font-family: sans-serif;
+            font-size: 12px;
+            padding: 2px 4px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
     <div id="legend">
         <div style="font-weight:bold; margin-bottom:8px;">空间布局 (Z轴向上)</div>
-        <div class="item"><span class="color-box" style="background: #ffff00;"></span>假目标 (0,0,0)</div>
-        <div class="item"><span class="color-box" style="background: #00ff00;"></span>真目标 (0,200,0)</div>
-        <div class="item"><span class="color-box" style="background: #ff4444;"></span>导弹 M1-M3</div>
-        <div class="item"><span class="color-box" style="background: #00aaff;"></span>无人机 FY1-FY5</div>
+        <div style="margin-bottom:4px;"><span style="color:#ffff00;">●</span> 假目标 (原点)</div>
+        <div style="margin-bottom:4px;"><span style="color:#00ff00;">●</span> 真目标 (0,200,0)</div>
     </div>
 
     <script type="importmap">
@@ -36,54 +43,77 @@
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
+        // 1. 初始化场景与渲染器
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 10, 200000);
-        camera.up.set(0, 0, 1); // Z轴向上
+        camera.up.set(0, 0, 1); // 严格遵循题目：Z轴向上
         
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        const controls = new OrbitControls(camera, renderer.domElement);
+        // 标签渲染器
+        const labelRenderer = new CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0px';
+        document.body.appendChild(labelRenderer.domElement);
+
+        const controls = new OrbitControls(camera, labelRenderer.domElement);
         controls.enableDamping = true;
 
-        // 辅助网格
+        // 2. 辅助设施
         const grid = new THREE.GridHelper(40000, 40, 0x222222, 0x111111);
         grid.rotation.x = Math.PI / 2;
         scene.add(grid);
-
-        // 坐标轴
         scene.add(new THREE.AxesHelper(3000));
 
-        // 通用点绘制函数
-        const addSmallPoint = (x, y, z, color, size = 60) => {
+        // 3. 带标签的点绘制函数
+        const addPointWithLabel = (x, y, z, color, name, size = 60) => {
+            // 绘制球体
             const mesh = new THREE.Mesh(
                 new THREE.SphereGeometry(size),
                 new THREE.MeshBasicMaterial({ color })
             );
             mesh.position.set(x, y, z);
             scene.add(mesh);
+
+            // 创建 HTML 标签
+            const div = document.createElement('div');
+            div.className = 'label';
+            div.textContent = name;
+            const label = new CSS2DObject(div);
+            label.position.set(0, 0, size + 100); // 标签位于球体上方
+            mesh.add(label);
         };
 
-        // 1. 目标点 (稍微大一点点以示区分)
-        addSmallPoint(0, 0, 0, 0xffff00, 100);    // 假目标 
-        addSmallPoint(0, 200, 0, 0x00ff00, 100);  // 真目标 
+        // --- 数据注入 ---
+        
+        // 目标点
+        addPointWithLabel(0, 0, 0, 0xffff00, "假目标(原点)", 100);
+        addPointWithLabel(0, 200, 0, 0x00ff00, "真目标", 100);
 
-        // 2. 导弹 
+        // 导弹群
         const missiles = [
-            [20000, 0, 2000], [19000, 600, 2100], [18000, -600, 1900]
+            { id: "M1", p: [20000, 0, 2000] },
+            { id: "M2", p: [19000, 600, 2100] },
+            { id: "M3", p: [18000, -600, 1900] }
         ];
-        missiles.forEach(p => addSmallPoint(...p, 0xff4444, 80));
+        missiles.forEach(m => addPointWithLabel(...m.p, 0xff4444, m.id, 80));
 
-        // 3. 无人机 
+        // 无人机群
         const uavs = [
-            [17800, 0, 1800], [12000, 1400, 1400], [6000, -3000, 700],
-            [11000, 2000, 1800], [13000, -2000, 1300]
+            { id: "FY1", p: [17800, 0, 1800] },
+            { id: "FY2", p: [12000, 1400, 1400] },
+            { id: "FY3", p: [6000, -3000, 700] },
+            { id: "FY4", p: [11000, 2000, 1800] },
+            { id: "FY5", p: [13000, -2000, 1300] }
         ];
-        uavs.forEach(p => addSmallPoint(...p, 0x00aaff, 70));
+        uavs.forEach(u => addPointWithLabel(...u.p, 0x00aaff, u.id, 70));
 
-        // 相机初始视角
+        // 4. 设置视角
         camera.position.set(22000, 12000, 8000);
         controls.target.set(8000, 0, 1000);
         controls.update();
@@ -92,6 +122,7 @@
             requestAnimationFrame(animate);
             controls.update();
             renderer.render(scene, camera);
+            labelRenderer.render(scene, camera); // 必须同时渲染标签
         }
         animate();
 
@@ -99,6 +130,7 @@
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
         });
     </script>
 </body>
